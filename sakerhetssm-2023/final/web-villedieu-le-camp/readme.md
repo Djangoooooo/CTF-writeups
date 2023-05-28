@@ -30,7 +30,7 @@ mux.GET("/api/doc", func(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 })
 ```
 
-Efter det skickar servern den bearbetade HTML-filen med en POST-request till endpointen /api/gen-cv, vilket vi antar står för PDF-konverteringen.
+Efter det skickar servern den bearbetade HTML-filen med en POST-request till endpointen /api/gen-cv, vilken vi antar står för PDF-konverteringen.
 
 ```GO
 mux.POST("/api/gen-cv", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -121,7 +121,7 @@ När vi nu requestar `/cv/cv-templat3.html` på den nya domänen får vi följan
 </html>
 ```
 
-Jämför vi parametrarna vi hittar på denna med dem vi vanligtvis skickar in via ursprungssidans form: `https://okejlama.movitz.dev/pdfapi/gen-cv?Name=Test&Skills=test`, inser vi att det finns en oanvänd parameter `ProfilePic`. Att modifiera den skulle låta oss ändra source-urlen för en bild vilket ger oss en tylig SSRF. Vi skickar därför en modifierad POST-request till `/pdfapi/gen-cv` (på den ursprungliga domänen) med en extra `ProfilePic`-parameter som pekar till `/flag`.
+Jämför vi parametrarna vi hittar på denna med dem vi vanligtvis skickar in via ursprungssidans form: `https://okejlama.movitz.dev/pdfapi/gen-cv?Name=Test&Skills=test`, inser vi att det finns en oanvänd parameter `ProfilePic`. Att modifiera den skulle låta oss ändra source-urlen för en bild vilket ger oss en tydlig SSRF. Vi skickar därför en modifierad POST-request till `/pdfapi/gen-cv` (på den ursprungliga domänen) med en extra `ProfilePic`-parameter som pekar till `/flag`.
 
 ```
 POST /pdfapi/gen-cv?Name=hihi&Skills=hoho&ProfilePic=/flag HTTP/2
