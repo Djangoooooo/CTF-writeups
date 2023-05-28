@@ -1,5 +1,4 @@
-
-# villedieu le camp - Säkerhets-SM web 400p
+# villedieu le camp - web 500p - Säkerhets-SM final 2023
 
 __Denna writeup är resultatet av ett samarbete mellan CTF-organisationerna Bängla int och DAGYCTF0X2.__
 
