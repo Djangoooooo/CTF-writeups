@@ -16,9 +16,14 @@ Avslöja din strategiska briljans och avslöja den dolda vägen till seger genom
 Skapare: Movitz Sunar
 
 ## Lösning
-Vi började med att läsa igenom serverns source code, skriven i Go. Där fann vi tre intressanta funktionaliteter.
+Vi börjar med att undersöka hemsidan som med ett formulär låter oss skapa ett cv på PDF-format.
 
-Först och främst använder servern Go-modulen html/template. Servern läser in en template-fil från static/cv/*, vi vet alltså inte inte det exakta filnamnet. För vidare analys kommer vi förmodligen vilja hitta det.
+![cv-maker-x2000](./cv-maker-x2000.png)
+![cv](./cv.png)
+
+Sedan läser vi igenom den bifogade filen `main.go`, serverns source code. Där finner vi några intressanta funktionaliteter.
+
+Först och främst använder servern Go-modulen `html/template`. Servern läser in en template-fil från `static/cv/*` (vi vet alltså inte templatets exakta namn och kommer för vidare analys vilja hitta det) och när endpointen `/api/doc` requestas genereras ett cv som ett HTML-dokument utifrån detta template.
 
 ```GO
 templ := template.Must(template.ParseFS(f, "static/cv/*"))
@@ -30,7 +35,7 @@ mux.GET("/api/doc", func(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 })
 ```
 
-Efter det skickar servern den bearbetade HTML-filen med en POST-request till endpointen /api/gen-cv, vilken vi antar står för PDF-konverteringen.
+Denna endpoint blir intressant när vi sedan ser till hur genereringen av vårt cv går till. När vi skickar in vårt formulär requestas `/api/gen-cv?query`. Servern tar då vår query och säger åt PDF-genereraren att skapa en PDF av den HTML-fil som hämtas från `/api/doc?query`. Denna PDF ges sedan till servern som kopierar den till oss.
 
 ```GO
 mux.POST("/api/gen-cv", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -69,9 +74,9 @@ mux.GET("/flag", func(w http.ResponseWriter, r *http.Request, p httprouter.Param
 })
 ```
 
-Vi vill alltså nå denna med till exempel SSRF.
+Vi vill alltså nå flaggfilen med till exempel SSRF.
 
-För att hitta möjliga injektionsvektorer behöver vi nu hitta ett sätt att extrahera det template som används. Ofta kan felmeddelanden läcka filnamnet och därför kan vi försöka nå /api/doc, vilket är den endpoint som hanterar template-bearbetningen. Vid första försöket ges inget eftersom den inte hittas och automatisk redirectar till index.html. Därför undersökte vi de requests som görs då vi genererar en PDF och observerar att endpointsen egentligen nås på `/pdfapi/*`. Requestas `/pdfapi/doc` utan några GET-parametrar orsakas följande felmeddelande:
+För att hitta möjliga injektionsvektorer behöver vi hitta ett sätt att extrahera det template som används. Ofta kan felmeddelanden läcka filnamnet och därför kan vi försöka nå `/api/doc`, vilket är den endpoint som hanterar template-bearbetningen. Vid första försök att direkt requesta den ges inget. Därför undersöker vi de requests som görs då vi genererar en PDF och observerar att endpointsen egentligen nås på `/pdfapi/*`. Requestas `/pdfapi/doc` utan några GET-parametrar orsakas följande felmeddelande:
 
 ```
 template: cv-templat3.html:12:11: executing "cv-templat3.html" at : error calling index: index of untyped nil
@@ -121,7 +126,7 @@ När vi nu requestar `/cv/cv-templat3.html` på den nya domänen får vi följan
 </html>
 ```
 
-Jämför vi parametrarna vi hittar på denna med dem vi vanligtvis skickar in via ursprungssidans form: `https://okejlama.movitz.dev/pdfapi/gen-cv?Name=Test&Skills=test`, inser vi att det finns en oanvänd parameter `ProfilePic`. Att modifiera den skulle låta oss ändra source-urlen för en bild vilket ger oss en tydlig SSRF. Vi skickar därför en modifierad POST-request till `/pdfapi/gen-cv` (på den ursprungliga domänen) med en extra `ProfilePic`-parameter som pekar till `/flag`.
+Jämför vi parametrarna vi hittar på denna med dem vi vanligtvis skickar in via ursprungssidans formulär: `https://okejlama.movitz.dev/pdfapi/gen-cv?Name=Test&Skills=test`, inser vi att det finns en oanvänd parameter `ProfilePic`. Att modifiera den skulle låta oss ändra source-urlen för en bild vilket ger oss en tydlig SSRF. Vi skickar därför en modifierad POST-request till `/pdfapi/gen-cv` (på den första domänen `okejlama.movitz.dev`) med en extra `ProfilePic`-parameter som pekar till `/flag`.
 
 ```
 POST /pdfapi/gen-cv?Name=hihi&Skills=hoho&ProfilePic=/flag HTTP/2
@@ -147,7 +152,7 @@ Vi får tillbaka en PDF men med en trasig bild som endast indikerar något sorts
     )
 ```
 
-Cachen varar i en minut och gäller för alla endpoints, inkluderande `/flag`. Det innebär att den cacheade endpointen görs tillgänglig efter att PDF-generatorn requestat och lyckats få ut den korrekta flaggan. Inom en minut kan vi därför genom att själva requesta `/flag`, få ut den cacheade och korrekta flaggan.
+Cachen varar i en minut och gäller för alla endpoints, inkluderande `/flag`. Efter att PDF-generatorn requestat och lyckats få ut den faktiska flaggan kommer endpointen alltså i en minut att ge denna. Gör vi snabbt en request till `/flag` är vi klara.
 
 Flagga: SSM{s1n3_duc3_c0rpu5}
 
